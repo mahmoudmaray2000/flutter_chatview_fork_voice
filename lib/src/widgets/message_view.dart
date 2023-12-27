@@ -236,8 +236,7 @@ class _MessageViewState extends State<MessageView>
                             : widget.outgoingChatBubbleConfig!.color!,
                         fontSize: 10),
                     controller: VoiceController(
-                      audioSrc:
-                          'https://back.qurancourses.technoraft.com/storage/742/audio_1703590388030.m4a',
+                      audioSrc: widget.message.message,
                       maxDuration: const Duration(minutes: 4),
                       isFile: false,
                       onComplete: () {},
