@@ -1,6 +1,6 @@
 import 'package:chatview/chatview.dart';
 import 'package:example/data.dart';
-import 'package:example/models/theme.dart';
+import 'package:example/chat_theme/theme.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -177,7 +177,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             receiptsWidgetConfig:
                 const ReceiptsWidgetConfig(showReceiptsIn: ShowReceiptsIn.all),
-            color: theme.outgoingChatBubbleColor,
+            color: Color(0xFF11897D),
           ),
           inComingChatBubbleConfig: ChatBubble(
             linkPreviewConfig: LinkPreviewConfiguration(

@@ -113,5 +113,21 @@ class Data {
       sendBy: '2',
       status: MessageStatus.read,
     ),
+    Message(
+      id: '13',
+      messageType: MessageType.voice,
+      message: "https://back.qurancourses.technoraft.com/storage/742/audio_1703590388030.m4a",
+      createdAt: DateTime.now(),
+      sendBy: '1',
+      status: MessageStatus.read,
+    ),
+    Message(
+      id: '14',
+      messageType: MessageType.voice,
+      message: "https://back.qurancourses.technoraft.com/storage/742/audio_1703590388030.m4a",
+      createdAt: DateTime.now(),
+      sendBy: '2',
+      status: MessageStatus.read,
+    ),
   ];
 }

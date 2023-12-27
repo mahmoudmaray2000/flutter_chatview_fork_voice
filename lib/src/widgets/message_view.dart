@@ -221,14 +221,30 @@ class _MessageViewState extends State<MessageView>
                   );
                 } else if (widget.message.messageType.isVoice) {
                   return VoiceMessageView(
-                    screenWidth: MediaQuery.of(context).size.width,
-                    message: widget.message,
-                    config: messageConfig?.voiceMessageConfig,
-                    onMaxDuration: widget.onMaxDuration,
-                    isMessageBySender: widget.isMessageBySender,
-                    messageReactionConfig: messageConfig?.messageReactionConfig,
-                    inComingChatBubbleConfig: widget.inComingChatBubbleConfig,
-                    outgoingChatBubbleConfig: widget.outgoingChatBubbleConfig,
+                    activeSliderColor: widget.isMessageBySender
+                        ? Colors.white
+                        : widget.outgoingChatBubbleConfig!.color!,
+                    backgroundColor: widget.isMessageBySender
+                        ? widget.outgoingChatBubbleConfig!.color!
+                        : widget.inComingChatBubbleConfig!.color!,
+                    circlesColor: widget.isMessageBySender
+                        ? Colors.white54
+                        : widget.outgoingChatBubbleConfig!.color!,
+                    counterTextStyle: TextStyle(
+                        color: widget.isMessageBySender
+                            ? widget.inComingChatBubbleConfig!.color!
+                            : widget.outgoingChatBubbleConfig!.color!,
+                        fontSize: 10),
+                    controller: VoiceController(
+                      audioSrc:
+                          'https://back.qurancourses.technoraft.com/storage/742/audio_1703590388030.m4a',
+                      maxDuration: const Duration(minutes: 4),
+                      isFile: false,
+                      onComplete: () {},
+                      onPause: () {},
+                      onPlaying: () {},
+                      onError: (err) {},
+                    ),
                   );
                 } else if (widget.message.messageType.isCustom &&
                     messageConfig?.customMessageBuilder != null) {

@@ -31,4 +31,9 @@ export 'src/values/typedefs.dart';
 export 'package:audio_waveforms/audio_waveforms.dart'
     show WaveStyle, PlayerWaveStyle;
 export 'src/models/receipts_widget_config.dart';
+export 'package:voice_message_package/voice_message_package.dart';
+export 'package:record/record.dart';
+export 'package:flutter_vibrate/flutter_vibrate.dart';
+export 'package:lottie/lottie.dart';
+export 'package:path_provider/path_provider.dart';
 export 'src/extensions/extensions.dart' show MessageTypes;

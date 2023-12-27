@@ -24,6 +24,7 @@ import 'dart:io' show Platform;
 
 import 'package:audio_waveforms/audio_waveforms.dart';
 import 'package:chatview/src/utils/constants/constants.dart';
+import 'package:chatview/src/widgets/voice_recorder.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -65,7 +66,11 @@ class ChatUITextField extends StatefulWidget {
   State<ChatUITextField> createState() => _ChatUITextFieldState();
 }
 
-class _ChatUITextFieldState extends State<ChatUITextField> {
+class _ChatUITextFieldState extends State<ChatUITextField>  with SingleTickerProviderStateMixin{
+
+  late AnimationController _controller;
+
+
   final ValueNotifier<String> _inputText = ValueNotifier('');
 
   final ImagePicker _imagePicker = ImagePicker();
@@ -108,6 +113,10 @@ class _ChatUITextFieldState extends State<ChatUITextField> {
         defaultTargetPlatform == TargetPlatform.android) {
       controller = RecorderController();
     }
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
   }
 
   @override
@@ -130,7 +139,7 @@ class _ChatUITextFieldState extends State<ChatUITextField> {
   Widget build(BuildContext context) {
     return Container(
       padding:
-          textFieldConfig?.padding ?? const EdgeInsets.symmetric(horizontal: 6),
+          textFieldConfig?.padding ?? const EdgeInsets.symmetric(horizontal: 0),
       margin: textFieldConfig?.margin,
       decoration: BoxDecoration(
         borderRadius: textFieldConfig?.borderRadius ??
@@ -259,14 +268,22 @@ class _ChatUITextFieldState extends State<ChatUITextField> {
                                 Platform.isIOS &&
                                 Platform.isAndroid &&
                                 !kIsWeb)
-                          IconButton(
-                            onPressed: _recordOrStop,
-                            icon: (isRecordingValue
-                                    ? voiceRecordingConfig?.micIcon
-                                    : voiceRecordingConfig?.stopIcon) ??
-                                Icon(isRecordingValue ? Icons.stop : Icons.mic),
-                            color: voiceRecordingConfig?.recorderIconColor,
-                          )
+                          RecordButton(
+                            controller: _controller,
+                            onSubmitVoice: (String path) {
+                              isRecording.value=false;
+                              widget.onRecordingComplete(path);
+                            },
+                            backGroundColor: voiceRecordingConfig!.recorderIconColor!,
+                          ),
+                        // IconButton(
+                        //   onPressed: _recordOrStop,
+                        //   icon: (isRecordingValue
+                        //           ? voiceRecordingConfig?.micIcon
+                        //           : voiceRecordingConfig?.stopIcon) ??
+                        //       Icon(isRecordingValue ? Icons.stop : Icons.mic),
+                        //   color: voiceRecordingConfig?.recorderIconColor,
+                        // )
                       ],
                     );
                   }

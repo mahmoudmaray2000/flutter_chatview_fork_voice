@@ -7,8 +7,8 @@ import 'package:chatview/src/widgets/reaction_widget.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-class VoiceMessageView extends StatefulWidget {
-  const VoiceMessageView({
+class VoiceMessageViewM extends StatefulWidget {
+  const VoiceMessageViewM({
     Key? key,
     required this.screenWidth,
     required this.message,
@@ -43,10 +43,10 @@ class VoiceMessageView extends StatefulWidget {
   final ChatBubble? outgoingChatBubbleConfig;
 
   @override
-  State<VoiceMessageView> createState() => _VoiceMessageViewState();
+  State<VoiceMessageViewM> createState() => _VoiceMessageViewMState();
 }
 
-class _VoiceMessageViewState extends State<VoiceMessageView> {
+class _VoiceMessageViewMState extends State<VoiceMessageViewM> {
   late PlayerController controller;
   late StreamSubscription<PlayerState> playerStateSubscription;
 
