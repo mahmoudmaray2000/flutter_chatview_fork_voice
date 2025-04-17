@@ -51,7 +51,7 @@ class _VoiceMessageViewMState extends State<VoiceMessageViewM> {
   late StreamSubscription<PlayerState> playerStateSubscription;
 
   final ValueNotifier<PlayerState> _playerState =
-      ValueNotifier(PlayerState.stopped);
+  ValueNotifier(PlayerState.stopped);
 
   PlayerState get playerState => _playerState.value;
 
@@ -64,7 +64,7 @@ class _VoiceMessageViewMState extends State<VoiceMessageViewM> {
       ..preparePlayer(
         path: widget.message.message,
         noOfSamples: widget.config?.playerWaveStyle
-                ?.getSamplesForWidth(widget.screenWidth * 0.5) ??
+            ?.getSamplesForWidth(widget.screenWidth * 0.5) ??
             playerWaveStyle.getSamplesForWidth(widget.screenWidth * 0.5),
       ).whenComplete(() => widget.onMaxDuration?.call(controller.maxDuration));
     playerStateSubscription = controller.onPlayerStateChanged
@@ -107,17 +107,17 @@ class _VoiceMessageViewMState extends State<VoiceMessageViewM> {
                   return IconButton(
                     onPressed: _playOrPause,
                     icon:
-                        state.isStopped || state.isPaused || state.isInitialised
-                            ? widget.config?.playIcon ??
-                                const Icon(
-                                  Icons.play_arrow,
-                                  color: Colors.white,
-                                )
-                            : widget.config?.pauseIcon ??
-                                const Icon(
-                                  Icons.stop,
-                                  color: Colors.white,
-                                ),
+                    state.isStopped || state.isPaused || state.isInitialised
+                        ? widget.config?.playIcon ??
+                        const Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                        )
+                        : widget.config?.pauseIcon ??
+                        const Icon(
+                          Icons.stop,
+                          color: Colors.white,
+                        ),
                   );
                 },
                 valueListenable: _playerState,
@@ -127,7 +127,7 @@ class _VoiceMessageViewMState extends State<VoiceMessageViewM> {
                 playerController: controller,
                 waveformType: WaveformType.fitWidth,
                 playerWaveStyle:
-                    widget.config?.playerWaveStyle ?? playerWaveStyle,
+                widget.config?.playerWaveStyle ?? playerWaveStyle,
                 padding: widget.config?.waveformPadding ??
                     const EdgeInsets.only(right: 10),
                 margin: widget.config?.waveformMargin,
@@ -151,14 +151,14 @@ class _VoiceMessageViewMState extends State<VoiceMessageViewM> {
 
   void _playOrPause() {
     assert(
-      defaultTargetPlatform == TargetPlatform.iOS ||
-          defaultTargetPlatform == TargetPlatform.android,
-      "Voice messages are only supported with android and ios platform",
+    defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.android,
+    "Voice messages are only supported with android and ios platform",
     );
     if (playerState.isInitialised ||
         playerState.isPaused ||
         playerState.isStopped) {
-      controller.startPlayer(finishMode: FinishMode.pause);
+      controller.startPlayer();
     } else {
       controller.pausePlayer();
     }

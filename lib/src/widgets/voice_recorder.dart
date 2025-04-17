@@ -1,559 +1,240 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter_vibrate/flutter_vibrate.dart';
-import 'package:lottie/lottie.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
+import 'dart:math';
 
-class RecordButton extends StatefulWidget {
-  const RecordButton({
-    Key? key,
-    required this.controller,
-    required this.onSubmitVoice,
-    required this.backGroundColor,
-  }) : super(key: key);
-
-  final AnimationController controller;
-  final Function(String path) onSubmitVoice;
-  final Color backGroundColor;
-
+class VoiceRecorderButton extends StatefulWidget {
   @override
-  State<RecordButton> createState() => _RecordButtonState();
+  _VoiceRecorderButtonState createState() => _VoiceRecorderButtonState();
 }
 
-class _RecordButtonState extends State<RecordButton>
+class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
     with SingleTickerProviderStateMixin {
-  static const double size = 55;
+  final FlutterSoundRecorder _recorder = FlutterSoundRecorder();
+  final FlutterSoundPlayer _player = FlutterSoundPlayer();
 
-  final double lockerHeight = 200;
-  double timerWidth = 0;
-
-  late Animation<double> buttonScaleAnimation;
-  late Animation<double> timerAnimation;
-  late Animation<double> lockerAnimation;
-
-  DateTime? startTime;
-  Timer? timer;
-  String recordDuration = "00:00";
-  Record? record;
-
-  bool isLocked = false;
-  bool showLottie = false;
   bool isRecording = false;
+  bool isLocked = false;
+  bool isCanceled = false;
+  bool isPlaying = false;
+
+  Offset startPosition = Offset.zero;
+  String? filePath;
+  double waveformHeight = 2.0;
+  int recordDuration = 0;
+  Timer? _timer;
+  Timer? _waveformTimer;
+  Random random = Random();
+
+  // Animation Controllers
+  late AnimationController _animationController;
+  late Animation<double> _scaleAnimation;
+  late Animation<Color?> _colorAnimation;
 
   @override
   void initState() {
     super.initState();
-    buttonScaleAnimation = Tween<double>(begin: 1, end: 2).animate(
-      CurvedAnimation(
-        parent: widget.controller,
-        curve: const Interval(0.0, 0.6, curve: Curves.elasticInOut),
-      ),
+    _initializeRecorder();
+    _player.openPlayer();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 300),
     );
-    widget.controller.addListener(() {
-      setState(() {});
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+
+    _colorAnimation = ColorTween(begin: Colors.blue, end: Colors.red)
+        .animate(_animationController);
+  }
+
+  Future<void> _initializeRecorder() async {
+    await _recorder.openRecorder();
+  }
+
+  Future<void> _startRecording() async {
+    final directory = await getApplicationDocumentsDirectory();
+    filePath = '${directory.path}/recording.aac';
+    await _recorder.startRecorder(toFile: filePath);
+
+    setState(() {
+      isRecording = true;
+      isCanceled = false;
+      isLocked = false;
+      recordDuration = 0;
+    });
+
+    _animationController.forward(); // Start animation
+
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() => recordDuration++);
+    });
+
+    _waveformTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      setState(() {
+        waveformHeight = 5 + random.nextInt(15).toDouble();
+      });
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    timerWidth =
-        MediaQuery.of(context).size.width - 2 * Globals.defaultPadding - 4;
-    timerAnimation =
-        Tween<double>(begin: timerWidth + Globals.defaultPadding, end: 0)
-            .animate(
-      CurvedAnimation(
-        parent: widget.controller,
-        curve: const Interval(0.2, 1, curve: Curves.easeIn),
-      ),
-    );
-    lockerAnimation =
-        Tween<double>(begin: lockerHeight + Globals.defaultPadding, end: 0)
-            .animate(
-      CurvedAnimation(
-        parent: widget.controller,
-        curve: const Interval(0.2, 1, curve: Curves.easeIn),
-      ),
-    );
+  Future<void> _stopRecording({bool cancel = false}) async {
+    await _recorder.stopRecorder();
+    _waveformTimer?.cancel();
+    _timer?.cancel();
+
+    setState(() {
+      isRecording = false;
+      waveformHeight = 2.0;
+    });
+
+    _animationController.reverse(); // Stop animation
+
+    if (cancel && filePath != null) {
+      File(filePath!).delete();
+      setState(() => filePath = null);
+    }
   }
 
-  @override
-  void dispose() {
-    record != null ? record!.dispose() : null;
-    timer?.cancel();
-    timer = null;
-    super.dispose();
+  Future<void> _playRecording() async {
+    if (filePath != null && File(filePath!).existsSync()) {
+      setState(() => isPlaying = true);
+      await _player.startPlayer(fromURI: filePath, whenFinished: () {
+        setState(() => isPlaying = false);
+      });
+    }
+  }
+
+  Future<void> _stopPlayback() async {
+    await _player.stopPlayer();
+    setState(() => isPlaying = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
+    return isLocked
+        ? Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        lockSlider(),
-        cancelSlider(),
-        audioButton(
-          color: widget.backGroundColor,
-          onSubmitVoice: widget.onSubmitVoice,
+        // Waveform Animation
+        Container(
+          height: 30,
+          width: 100,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: List.generate(
+              5,
+                  (index) => AnimatedContainer(
+                duration: Duration(milliseconds: 100),
+                width: 6,
+                height: waveformHeight + (index.isEven ? 2 : -2),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+          ),
         ),
-        if (isLocked) timerLocked(onSubmitVoice: widget.onSubmitVoice),
+        SizedBox(height: 5),
+        // Row with Send, Play, Delete
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: Icon(Icons.send, color: Colors.blue),
+              onPressed: () {
+                print("Audio Sent: $filePath");
+                setState(() => isLocked = false);
+              },
+            ),
+            IconButton(
+              icon: Icon(
+                  isPlaying ? Icons.stop : Icons.play_arrow,
+                  color: Colors.green),
+              onPressed: isPlaying ? _stopPlayback : _playRecording,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                _stopRecording(cancel: true);
+                setState(() => isLocked = false);
+              },
+            ),
+          ],
+        ),
+      ],
+    )
+        : Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        GestureDetector(
+          onLongPressStart: (details) {
+            _startRecording();
+            startPosition = details.globalPosition;
+          },
+          onLongPressMoveUpdate: (details) {
+            double dx = details.globalPosition.dx - startPosition.dx;
+            double dy = details.globalPosition.dy - startPosition.dy;
+
+            if (dx < -100) {
+              setState(() => isCanceled = true);
+              _stopRecording(cancel: true);
+            }
+
+            if (dy < -100) {
+              setState(() => isLocked = true);
+            }
+          },
+          onLongPressEnd: (details) {
+            if (!isLocked && !isCanceled) {
+              _stopRecording();
+            }
+          },
+          child: AnimatedBuilder(
+            animation: _animationController,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _colorAnimation.value,
+                  ),
+                  child: Icon(
+                    isLocked ? Icons.stop : Icons.mic,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        if (isRecording)
+          Text("← Slide to Cancel",
+              style: TextStyle(color: Colors.red, fontSize: 14)),
+        if (isRecording)
+          Text(
+            "${(recordDuration ~/ 60).toString().padLeft(2, '0')}:${(recordDuration % 60).toString().padLeft(2, '0')}",
+            style: TextStyle(color: Colors.white, fontSize: 16),
+          ),
       ],
     );
   }
 
-  Widget lockSlider() {
-    return Positioned(
-      bottom: -lockerAnimation.value,
-      child: Container(
-        height: lockerHeight,
-        width: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Globals.borderRadius),
-          color: isRecording==true? Colors.white:Colors.transparent,
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            const Icon(
-              Icons.lock,
-              color: Colors.green,
-            ),
-            const SizedBox(height: 8),
-            FlowShader(
-              direction: Axis.vertical,
-              child: Column(
-                children: const [
-                  Icon(Icons.keyboard_arrow_up),
-                  Icon(Icons.keyboard_arrow_up),
-                  Icon(Icons.keyboard_arrow_up),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget cancelSlider() {
-    return Positioned(
-      right: -timerAnimation.value,
-      child: Container(
-        height: size,
-        width: timerWidth,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Globals.borderRadius),
-          color: Colors.white,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              showLottie ? const LottieAnimation() : Text(recordDuration),
-              const SizedBox(width: size),
-              FlowShader(
-                child: Row(
-                  children: const [
-                    Icon(Icons.keyboard_arrow_left),
-                    Text("Slide to cancel")
-                  ],
-                ),
-                duration: const Duration(seconds: 3),
-                flowColors: const [Colors.white, Colors.grey],
-              ),
-              const SizedBox(width: size),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget timerLocked({Function(String path)? onSubmitVoice}) {
-    return Positioned(
-      right: 0,
-      child: Container(
-        height: size,
-        width: timerWidth,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Globals.borderRadius),
-          color: Colors.white,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.only(left: 15, right: 25),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            // mainAxisSize: MainAxisSize.max,
-            children: [
-              //Todo: edit this
-              // GestureDetector(
-              //   behavior: HitTestBehavior.translucent,
-              //   onTap: () async {
-              //     widget.controller.reverse();
-              //     print("pressss");
-              //     Vibrate.feedback(FeedbackType.success);
-              //     timer?.cancel();
-              //     timer = null;
-              //     startTime = null;
-              //     recordDuration = "00:00";
-              //
-              //     var filePath = await Record().stop();
-              //     AudioState.files.add(filePath!);
-              //     Globals.audioListKey.currentState!
-              //         .insertItem(AudioState.files.length - 1);
-              //     debugPrint(filePath);
-              //     setState(() {
-              //       isLocked = false;
-              //     });
-              //
-              //     // Timer(const Duration(milliseconds: 1440), () async {
-              //     //   widget.controller.reverse();
-              //     //   debugPrint("Cancelled recording");
-              //     //   var filePath = await record.stop();
-              //     //   debugPrint(filePath);
-              //     //   File(filePath!).delete();
-              //     //   debugPrint("Deleted $filePath");
-              //     //   setState(() {
-              //     //     showLottie = false;
-              //     //     isLocked=false;
-              //     //
-              //     //   });
-              //     // });
-              //   },
-              //   child: const Center(
-              //     child: Icon(
-              //       Icons.delete,
-              //       color: Colors.red,
-              //     ),
-              //   ),
-              // ),
-              Text(recordDuration),
-              FlowShader(
-                child: const Text("Tap lock to send"),
-                duration: const Duration(seconds: 3),
-                flowColors: const [Colors.white, Colors.grey],
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () async {
-                  widget.controller.reverse();
-
-                  Vibrate.feedback(FeedbackType.success);
-
-                  timer?.cancel();
-                  timer = null;
-                  startTime = null;
-                  recordDuration = "00:00";
-
-                  var filePath = await Record().stop();
-                  AudioState.files.add(filePath!);
-                  debugPrint(filePath);
-                  setState(() {
-                    isLocked = false;
-                  });
-                  onSubmitVoice!(filePath);
-                },
-                child: const Center(
-                  child: Icon(
-                    Icons.send,
-                    size: 18,
-                    color: Colors.green,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget audioButton(
-      {Function(String path)? onSubmitVoice, required Color color}) {
-    return GestureDetector(
-      child: Transform.scale(
-        scale: buttonScaleAnimation.value,
-        child: Container(
-          child: Icon(
-            Icons.mic,
-            color: Colors.white,
-          ),
-          height: size,
-          width: size,
-          clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-          ),
-        ),
-      ),
-      onLongPressDown: (_) {
-        debugPrint("onLongPressDown");
-        widget.controller.forward();
-      },
-      onLongPressEnd: (details) async {
-        debugPrint("onLongPressEnd");
-
-        if (isCancelled(details.localPosition, context)) {
-          Vibrate.feedback(FeedbackType.heavy);
-          timer?.cancel();
-          timer = null;
-          startTime = null;
-          recordDuration = "00:00";
-
-          setState(() {
-            showLottie = true;
-          });
-
-          Timer(const Duration(milliseconds: 1440), () async {
-            widget.controller.reverse();
-            debugPrint("Cancelled recording");
-            var filePath = await record!.stop();
-            debugPrint(filePath);
-            File(filePath!).delete();
-            debugPrint("Deleted $filePath");
-            showLottie = false;
-          });
-        } else if (checkIsLocked(details.localPosition)) {
-          widget.controller.reverse();
-
-          Vibrate.feedback(FeedbackType.heavy);
-          debugPrint("Locked recording");
-          debugPrint(details.localPosition.dy.toString());
-          setState(() {
-            isLocked = true;
-          });
-        } else {
-          widget.controller.reverse();
-
-          Vibrate.feedback(FeedbackType.success);
-
-          timer?.cancel();
-          timer = null;
-          startTime = null;
-          recordDuration = "00:00";
-
-          var filePath = await Record().stop();
-          AudioState.files.add(filePath!);
-          // Globals.audioListKey.currentState!
-          //     .insertItem(AudioState.files.length - 1);
-          debugPrint(filePath);
-          onSubmitVoice!(filePath);
-        }
-        setState(() {
-          isRecording=false;
-        });
-      },
-      onLongPressCancel: () {
-        debugPrint("onLongPressCancel");
-        widget.controller.reverse();
-      },
-      onLongPress: () async {
-        debugPrint("onLongPress");
-        final documentPath =
-            "${(await getApplicationDocumentsDirectory()).path}/";
-
-        Vibrate.feedback(FeedbackType.success);
-        if (await Record().hasPermission()) {
-          record = Record();
-          await record!.start(
-            path:
-                "${documentPath}audio_${DateTime.now().millisecondsSinceEpoch}.m4a",
-            encoder: AudioEncoder.aacLc,
-            bitRate: 128000,
-            samplingRate: 44100,
-          );
-          setState(() {
-            isRecording = true;
-          });
-
-          startTime = DateTime.now();
-          timer = Timer.periodic(const Duration(seconds: 1), (_) {
-            final minDur = DateTime.now().difference(startTime!).inMinutes;
-            final secDur = DateTime.now().difference(startTime!).inSeconds % 60;
-            String min = minDur < 10 ? "0$minDur" : minDur.toString();
-            String sec = secDur < 10 ? "0$secDur" : secDur.toString();
-            setState(() {
-              recordDuration = "$min:$sec";
-            });
-          });
-        }
-      },
-    );
-  }
-
-  bool checkIsLocked(Offset offset) {
-    return (offset.dy < -35);
-  }
-
-  bool isCancelled(Offset offset, BuildContext context) {
-    return (offset.dx < -(MediaQuery.of(context).size.width * 0.2));
-  }
-}
-
-class Globals {
-  Globals._();
-
-  static init() async {
-    documentPath = "${(await getApplicationDocumentsDirectory()).path}/";
-  }
-
-  static const double borderRadius = 27;
-  static const double defaultPadding = 8;
-  static String documentPath = '';
-  static GlobalKey<AnimatedListState> audioListKey =
-      GlobalKey<AnimatedListState>();
-}
-
-class AudioState {
-  AudioState._();
-
-  static List<String> files = [];
-}
-
-class FlowShader extends StatefulWidget {
-  const FlowShader({
-    Key? key,
-    required this.child,
-    this.duration = const Duration(seconds: 2),
-    this.direction = Axis.horizontal,
-    this.flowColors = const <Color>[Colors.white, Colors.black],
-  })  : assert(flowColors.length == 2),
-        super(key: key);
-
-  final Widget child;
-  final Axis direction;
-  final Duration duration;
-  final List<Color> flowColors;
-
-  @override
-  _FlowShaderState createState() => _FlowShaderState();
-}
-
-class _FlowShaderState extends State<FlowShader>
-    with SingleTickerProviderStateMixin {
-  late AnimationController controller;
-  late Animation animation1;
-  late Animation animation2;
-  late Animation animation3;
-
   @override
   void dispose() {
-    controller.dispose();
+    _recorder.closeRecorder();
+    _player.closePlayer();
+    _animationController.dispose();
+    _timer?.cancel();
+    _waveformTimer?.cancel();
     super.dispose();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-    );
-    final TweenSequenceItem seqbw = TweenSequenceItem(
-      tween: ColorTween(
-        begin: widget.flowColors.last,
-        end: widget.flowColors.first,
-      ),
-      weight: 1,
-    );
-    final TweenSequenceItem seqwb = TweenSequenceItem(
-      tween: ColorTween(
-        begin: widget.flowColors.first,
-        end: widget.flowColors.last,
-      ),
-      weight: 1,
-    );
-    animation1 = TweenSequence([seqbw, seqwb]).animate(
-      CurvedAnimation(
-        parent: controller,
-        curve: const Interval(0.0, 0.45, curve: Curves.linear),
-      ),
-    );
-    animation2 = TweenSequence([seqbw, seqwb]).animate(
-      CurvedAnimation(
-        parent: controller,
-        curve: const Interval(0.15, 0.75, curve: Curves.linear),
-      ),
-    );
-    animation3 = TweenSequence([seqbw, seqwb]).animate(
-      CurvedAnimation(
-        parent: controller,
-        curve: const Interval(0.45, 1, curve: Curves.linear),
-      ),
-    );
-    controller.repeat();
-    controller.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (rect) {
-        return LinearGradient(
-          colors: [
-            animation3.value,
-            animation2.value,
-            animation1.value,
-          ],
-          begin: widget.direction == Axis.horizontal
-              ? Alignment.centerLeft
-              : Alignment.topCenter,
-          end: widget.direction == Axis.horizontal
-              ? Alignment.centerRight
-              : Alignment.bottomCenter,
-        ).createShader(rect);
-      },
-      child: widget.child,
-    );
-  }
-}
-
-class LottieAnimation extends StatefulWidget {
-  const LottieAnimation({Key? key}) : super(key: key);
-
-  @override
-  State<LottieAnimation> createState() => _LottieAnimationState();
-}
-
-class _LottieAnimationState extends State<LottieAnimation>
-    with SingleTickerProviderStateMixin {
-  late AnimationController controller;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = AnimationController(vsync: this);
-  }
-
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      child: Lottie.asset(
-        'packages/chatview/assets/json/dustbin.json',
-        controller: controller,
-        onLoaded: (composition) {
-          controller
-            ..duration = composition.duration
-            ..forward();
-          debugPrint("Lottie Duration: ${composition.duration}");
-        },
-        height: 40,
-        width: 40,
-      ),
-    );
   }
 }
