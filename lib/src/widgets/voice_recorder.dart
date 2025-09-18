@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'package:path_provider/path_provider.dart'; // ADD THIS IMPORT
+
 import 'package:flutter/material.dart';
-import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart'; // Use record plugin's Record class
 
 class VoiceRecorderButton extends StatefulWidget {
   @override
@@ -13,7 +14,8 @@ class VoiceRecorderButton extends StatefulWidget {
 
 class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
     with SingleTickerProviderStateMixin {
-  final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioRecorder _audioRecorder =
+      AudioRecorder(); // Official record class instance
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   bool _isRecording = false;
@@ -22,7 +24,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
   bool _isPlaying = false;
 
   Offset _startPosition = Offset.zero;
-  String? _filePath; // This holds the path of the *finished* recording
+  String? _filePath; // Path of finished recording
   double _waveformHeight = 2.0;
   Duration _recordDuration = Duration.zero;
   Timer? _recordingTimer;
@@ -37,6 +39,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
   void initState() {
     super.initState();
     _setupAnimations();
+
     _audioPlayer.playerStateStream.listen((playerState) {
       if (mounted) {
         setState(() {
@@ -55,7 +58,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
   void _setupAnimations() {
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
     );
 
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
@@ -66,12 +69,10 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
         .animate(_animationController);
   }
 
-  // --- FIXED: Generate a new path for each recording ---
   Future<String> _getNewRecordingPath() async {
-    final directory =
-        await getTemporaryDirectory(); // Use temp directory for recordings
+    final directory = await getTemporaryDirectory();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    return '${directory.path}/recording_$timestamp.aac';
+    return '${directory.path}/recording_$timestamp.m4a'; // use common format
   }
 
   Future<void> _startRecording() async {
@@ -81,14 +82,12 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
       }
       await _audioPlayer.stop();
 
-      // Generate a unique file path for this new recording session
       String newFilePath = await _getNewRecordingPath();
 
-      // Start the recorder with the required path parameter
       await _audioRecorder.start(
-        const RecordConfig(),
-        path: newFilePath, // Use the newly generated path
-      );
+          path: newFilePath, // required path parameter
+          RecordConfig(
+              encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100));
 
       setState(() {
         _isRecording = true;
@@ -96,39 +95,42 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
         _isLocked = false;
         _recordDuration = Duration.zero;
         _isPlaying = false;
-        // Don't set _filePath yet, only if the recording is successful and not canceled
       });
 
       _animationController.forward();
       _startTimer();
 
-      _waveformTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      _waveformTimer =
+          Timer.periodic(const Duration(milliseconds: 100), (timer) {
         setState(() {
           _waveformHeight = 5 + _random.nextInt(15).toDouble();
         });
       });
     } catch (e) {
       print("Failed to start recording: $e");
-      // Consider showing an error message to the user here
     }
   }
 
   void _startTimer() {
     _recordingTimer?.cancel();
-    _recordingTimer = Timer.periodic(Duration(seconds: 1), (Timer t) {
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
-        _recordDuration += Duration(seconds: 1);
+        _recordDuration += const Duration(seconds: 1);
       });
     });
   }
 
-  // --- FIXED: Use the path returned by stop() ---
   Future<void> _stopRecording({bool cancel = false}) async {
     _waveformTimer?.cancel();
     _recordingTimer?.cancel();
 
-    // Stop the recording and get the path of the file that was being recorded
-    String? recordedFilePath = await _audioRecorder.stop();
+    String? recordedFilePath;
+
+    try {
+      recordedFilePath = await _audioRecorder.stop();
+    } catch (e) {
+      print("Failed to stop recording: $e");
+    }
 
     setState(() {
       _isRecording = false;
@@ -138,23 +140,19 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
     _animationController.reverse();
 
     if (cancel) {
-      // Delete the file we were just recording to
       if (recordedFilePath != null) {
         final file = File(recordedFilePath);
         if (await file.exists()) {
           await file.delete();
         }
       }
-      // Clear the stored path since we canceled
       setState(() {
         _filePath = null;
       });
     } else {
-      // Save the path of the successfully completed recording
       setState(() {
-        _filePath = recordedFilePath; // This is the path we started with
+        _filePath = recordedFilePath;
       });
-      // Preload the new audio file for playback
       if (_filePath != null) {
         await _audioPlayer.setFilePath(_filePath!);
       }
@@ -167,7 +165,6 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
       await _audioPlayer.play();
     } catch (e) {
       print("Playback failed: $e");
-      // Try to reset the audio source if play fails
       await _audioPlayer.setFilePath(_filePath!);
     }
   }
@@ -176,7 +173,6 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
     await _audioPlayer.stop();
   }
 
-  // ... build methods ( _buildLockedUI, _buildRecordingUI ) remain the same ...
   @override
   Widget build(BuildContext context) {
     return _isLocked ? _buildLockedUI() : _buildRecordingUI();
@@ -195,7 +191,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
             children: List.generate(
               5,
               (index) => AnimatedContainer(
-                duration: Duration(milliseconds: 100),
+                duration: const Duration(milliseconds: 100),
                 width: 6,
                 height: _waveformHeight + (index.isEven ? 2 : -2),
                 decoration: BoxDecoration(
@@ -206,12 +202,12 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
             ),
           ),
         ),
-        SizedBox(height: 5),
+        const SizedBox(height: 5),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              icon: Icon(Icons.send, color: Colors.blue),
+              icon: const Icon(Icons.send, color: Colors.blue),
               onPressed: () {
                 print("Audio Sent: $_filePath");
                 setState(() => _isLocked = false);
@@ -225,7 +221,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
               onPressed: _isPlaying ? _stopPlayback : _playRecording,
             ),
             IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () async {
                 await _stopRecording(cancel: true);
                 if (mounted) {
@@ -278,7 +274,7 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
               return Transform.scale(
                 scale: _scaleAnimation.value,
                 child: Container(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: _colorAnimation.value,
@@ -294,18 +290,17 @@ class _VoiceRecorderButtonState extends State<VoiceRecorderButton>
           ),
         ),
         if (_isRecording && !_isCanceled) ...[
-          Text("← Slide to Cancel",
+          const Text("← Slide to Cancel",
               style: TextStyle(color: Colors.red, fontSize: 14)),
           Text(
             formattedDuration,
-            style: TextStyle(color: Colors.white, fontSize: 16),
+            style: const TextStyle(color: Colors.white, fontSize: 16),
           ),
         ],
       ],
     );
   }
 
-  // ... dispose() remains the same ...
   @override
   void dispose() {
     _audioRecorder.dispose();
