@@ -32,7 +32,7 @@ dependencies:
   voice_message_package: ^2.1.4
   flutter_vibrate: ^1.3.0
   record: ^6.1.1
-  flutter_sound: ^9.26.0
+  flutter_sound: ^9.28.0
   lottie: any
 
   # For formatting time locale in message receipts
