@@ -116,7 +116,8 @@ class Data {
     Message(
       id: '13',
       messageType: MessageType.voice,
-      message: "https://back.qurancourses.technoraft.com/storage/742/audio_1703590388030.m4a",
+      message:
+          "https://app.banhawyclinics.com/storage/19/175849292368d078fb2cfa3.m4a",
       createdAt: DateTime.now(),
       sendBy: '1',
       status: MessageStatus.read,
@@ -124,7 +125,8 @@ class Data {
     Message(
       id: '14',
       messageType: MessageType.voice,
-      message: "https://back.qurancourses.technoraft.com/storage/742/audio_1703590388030.m4a",
+      message:
+          "https://app.banhawyclinics.com/storage/19/175849292368d078fb2cfa3.m4a",
       createdAt: DateTime.now(),
       sendBy: '2',
       status: MessageStatus.read,
